@@ -14,13 +14,14 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
+      
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       # 1. Image nur lokal im Runner bauen (noch nicht pushen!)
       - name: Build Docker Image for Testing
         run: docker build -t local-test-image .
