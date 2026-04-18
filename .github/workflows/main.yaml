@@ -1,0 +1,29 @@
+name: Docker Build Check
+
+# Wann soll die Pipeline starten?
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    # Auf welchem Betriebssystem soll der Runner laufen?
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Den Code vom Repo auf den Runner kopieren
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Docker Image bauen (wie du es lokal getan hast)
+      - name: Build Docker Image
+        run: docker build -t test-image .
+
+      # 3. Testen, ob der Container startet
+      - name: Test Container Run
+        run: |
+          docker run -d -p 8080:80 --name test-container test-image
+          sleep 5
+          curl --fail http://localhost:8080 | grep "DevOps"
