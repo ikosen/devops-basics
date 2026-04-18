@@ -1,29 +1,36 @@
-name: Docker Build Check
+name: Docker Build and Push
 
-# Wann soll die Pipeline starten?
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+
+# Erforderliche Berechtigung, um Pakete (Images) zu schreiben
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  build-and-test:
-    # Auf welchem Betriebssystem soll der Runner laufen?
+  build-and-push:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Den Code vom Repo auf den Runner kopieren
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Docker Image bauen (wie du es lokal getan hast)
-      - name: Build Docker Image
-        run: docker build -t test-image .
+      # 1. Login bei GitHub Container Registry
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. Testen, ob der Container startet
-      - name: Test Container Run
-        run: |
-          docker run -d -p 8080:80 --name test-container test-image
-          sleep 5
-          curl --fail http://localhost:8080 | grep "DevOps"
+      # 2. Image bauen und pushen
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Der Name des Images (alles klein schreiben!)
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/devops-webserver:latest
+            ghcr.io/${{ github.repository_owner }}/devops-webserver:${{ github.sha }}
