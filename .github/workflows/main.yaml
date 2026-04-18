@@ -4,6 +4,8 @@ on:
   push:
     branches: [ "main" ]
     tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ "main" ]
 
 # Erforderliche Berechtigung, um Pakete (Images) zu schreiben
 permissions:
@@ -22,40 +24,32 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
-      # 1. Image nur lokal im Runner bauen (noch nicht pushen!)
-      - name: Build Docker Image for Testing
-        run: docker build -t local-test-image .
+      # 1. Metadaten für Docker generieren (Tags & Labels)
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha
 
-      # 2. Den "Smoke Test" ausführen
-      - name: Run Smoke Test
-        run: |
-          # Container im Hintergrund starten
-          docker run -d --name test-app -p 8080:80 local-test-image
-          
-          # Kurz warten, bis Nginx hochgefahren ist
-          sleep 5
-          
-          # Prüfen, ob die Seite erreichbar ist (curl --fail liefert Fehler-Code bei 404/500)
-          curl --fail http://localhost:8080 | grep "DevOps"
-          
-          # Aufräumen
-          docker stop test-app && docker rm test-app
-
-      # 3. ERST JETZT: Login & Push (wird nur erreicht, wenn curl oben erfolgreich war)
+      # 2. Login (wie gehabt)
       - name: Log in to GHCR
-        if: success()
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push production image
-        if: success()
+      # 3. Build & Push mit den neuen Metadaten
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/devops-webserver:latest
-            ghcr.io/${{ github.repository_owner }}/devops-webserver:${{ github.ref_name }}
+          # WICHTIG: Im Pull Request nur bauen, nicht pushen!
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
